@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Marisol Bay — Open-World Crime Game</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0e1622; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #fff; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  #hud { position: fixed; inset: 0; pointer-events: none; display: none; }
+  .panel { position: absolute; background: rgba(10, 18, 30, 0.72); border: 1px solid rgba(255, 207, 63, 0.45); border-radius: 10px; padding: 10px 14px; }
+  #objective { top: 14px; left: 14px; max-width: 460px; font-size: 14px; line-height: 1.45; }
+  #objective b { color: #ffcf3f; }
+  #stars { position: absolute; top: 14px; right: 14px; font-size: 26px; letter-spacing: 4px; color: #ffcf3f; text-shadow: 0 0 8px rgba(0,0,0,0.8); }
+  #stars.hot { color: #ff3b30; } #stars.warm { color: #ff9a2a; }
+  #stats { bottom: 14px; left: 14px; font-size: 15px; line-height: 1.7; min-width: 210px; }
+  #health-bar { width: 180px; height: 10px; background: #333; border-radius: 5px; overflow: hidden; }
+  #health-fill { height: 100%; width: 100%; background: #3ecf5a; }
+  #cash { color: #7dff8a; font-weight: 700; font-size: 18px; }
+  #minimap-wrap { position: absolute; right: 14px; bottom: 14px; width: 168px; height: 168px; border-radius: 50%; overflow: hidden; border: 3px solid rgba(255,207,63,0.7); background: #1d2b1a; }
+  #minimap { width: 168px; height: 168px; display: block; }
+  #weapon-wheel { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; }
+  .slot { background: rgba(10,18,30,0.72); border: 1px solid #888; border-radius: 8px; padding: 6px 12px; font-size: 13px; }
+  .slot.active { border-color: #ffcf3f; color: #ffcf3f; }
+  #toast { position: absolute; top: 84px; left: 50%; transform: translateX(-50%); background: rgba(10,18,30,0.85); border: 1px solid #ffcf3f; border-radius: 8px; padding: 8px 16px; font-size: 14px; opacity: 0; transition: opacity 0.3s; white-space: nowrap; }
+  #controls { position: absolute; bottom: 196px; right: 14px; font-size: 11px; color: #cfe0ff; background: rgba(10,18,30,0.6); border-radius: 8px; padding: 8px 10px; line-height: 1.6; text-align: right; }
+  .screen { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: linear-gradient(160deg, rgba(10,30,60,0.88), rgba(60,20,40,0.82)); text-align: center; padding: 20px; z-index: 5; }
+  .screen h1 { font-size: 56px; margin: 0; color: #ffcf3f; text-shadow: 0 4px 0 #b3541e; letter-spacing: 2px; }
+  .screen h2 { font-size: 20px; font-weight: 400; color: #ffe9a8; margin: 8px 0 18px; }
+  .screen p { max-width: 620px; line-height: 1.6; color: #e8eef7; }
+  .screen button { pointer-events: auto; cursor: pointer; background: #ffcf3f; color: #1a1200; border: 0; border-radius: 10px; padding: 14px 28px; font-size: 18px; font-weight: 700; margin: 6px; }
+  .screen button.secondary { background: transparent; color: #ffcf3f; border: 2px solid #ffcf3f; }
+  #pause-screen, #over-screen { display: none; }
+  kbd { background: #222; border: 1px solid #666; border-radius: 4px; padding: 1px 6px; }
+</style>
+<script type="importmap">{"imports": {"three": "./vendor/three.module.min.js"}}</script>
+</head>
+<body>
+<canvas id="game" aria-label="Marisol Bay: an open-world crime game in a sun-soaked coastal city"></canvas>
+<p id="status" role="status" aria-live="polite"></p>
+<div id="hud">
+  <div id="objective" class="panel"><b>MARISOL BAY</b><br><span id="objective-text">Steal a car and drive to the Docks.</span></div>
+  <div id="stars" class="stars">☆☆☆☆☆</div>
+  <div id="stats" class="panel">
+    <div id="cash">$250</div>
+    <div id="health-bar"><div id="health-fill"></div></div>
+    <div id="health-text">HP 100</div>
+    <div id="speed">On foot</div>
+    <div><span id="weapon">Pistol</span> · <span id="ammo">48 / 120</span></div>
+    <div id="radio">Bay FM — coastal pop</div>
+  </div>
+  <div id="minimap-wrap"><canvas id="minimap" width="168" height="168"></canvas></div>
+  <div id="weapon-wheel"><span class="slot active">1 Pistol</span><span class="slot">2 SMG 🔒 M6</span></div>
+  <div id="toast"></div>
+  <div id="controls">WASD drive / walk · <kbd>E</kbd> steal / exit car<br>Click shoot · <kbd>1</kbd>/<kbd>2</kbd> weapon · <kbd>R</kbd> radio<br><kbd>M</kbd> mute · <kbd>L</kbd> save · <kbd>Esc</kbd> pause</div>
+</div>
+<div id="start-screen" class="screen">
+  <h1>MARISOL BAY</h1>
+  <h2>An open-world crime game in a sun-soaked coastal city</h2>
+  <p>Eight story missions, a living city with traffic and pedestrians, a wanted system with police cars, roadblocks and a helicopter, car theft, pistol and SMG combat, a garage, a radio and a save that keeps your progress. Steal a car, run the jobs, and become the King of Marisol Bay.</p>
+  <div><button id="start-btn">Start New Game</button><button id="continue-btn" class="secondary">Continue Save</button></div>
+  <p>WASD move / drive · E steal car · Click shoot · 1/2 weapons · R radio · Esc pause · L save</p>
+</div>
+<div id="pause-screen" class="screen">
+  <h1>PAUSED</h1>
+  <p>Marisol Bay waits for no one — except right now.</p>
+  <div><button id="resume-btn">Resume</button></div>
+</div>
+<div id="over-screen" class="screen">
+  <h1>BUSTED</h1>
+  <p id="over-text"></p>
+  <div><button id="restart-btn">Try Again</button></div>
+</div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
